@@ -1,0 +1,1 @@
+# Dockerization settings for GhostCode
