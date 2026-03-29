@@ -1,14 +1,13 @@
-# Virtual env
-venv/
-env/
-
-# Python cache
 __pycache__/
 *.pyc
-
-# Environment variables
-.env
-
-# OS files
+*.pyo
+.env.local
+.env.*.local
+*.sqlite
+*.db
 .DS_Store
-Thumbs.db
+venv/
+.venv/
+*.egg-info/
+dist/
+.pytest_cache/

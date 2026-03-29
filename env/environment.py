@@ -1,0 +1,1 @@
+# GhostCode core environment logic
