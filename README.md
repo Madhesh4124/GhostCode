@@ -1,3 +1,12 @@
+---
+title: GhostCode
+emoji: "👻"
+colorFrom: blue
+colorTo: cyan
+sdk: docker
+pinned: false
+---
+
 # GhostCode
 
 > A reinforcement learning environment for autonomous debugging
@@ -179,6 +188,6 @@ Server sends    → {"type": "done", "final_score": 1.0, "steps": 7}
 ## Deployment
 
 Hosted on Hugging Face Spaces:
-[https://huggingface.co/spaces/YOUR_USERNAME/ghostcode](https://huggingface.co/spaces/YOUR_USERNAME/ghostcode)
+[https://huggingface.co/spaces/Madhesh4124/GhostCode](https://huggingface.co/spaces/Madhesh4124/GhostCode)
 
 Built with **FastAPI + WebSockets**. No external RL framework required.
