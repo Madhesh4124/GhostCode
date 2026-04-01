@@ -221,5 +221,8 @@ async def websocket_endpoint(
 # Entry point
 # ---------------------------------------------------------------------------
 
+def main():
+    uvicorn.run(app, host="0.0.0.0", port=int(os.getenv("PORT", 7860)))
+
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=int(os.getenv("PORT", 7860)), reload=False)
+    main()

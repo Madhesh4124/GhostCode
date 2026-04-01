@@ -18,7 +18,7 @@ dependencies = [
 ]
 
 [project.scripts]
-ghostcode-server = "server:app"
+ghostcode-server = "server.app:main"
 
 [project.urls]
 Homepage = "https://huggingface.co/spaces/Madhesh4124/GhostCode"
