@@ -37,6 +37,18 @@ class ResetRequest(BaseModel):
 # REST endpoints
 # ---------------------------------------------------------------------------
 
+@app.get("/")
+async def root():
+    return {
+        "name": "GhostCode",
+        "version": "0.1.0",
+        "description": "RL environment for autonomous debugging of legacy systems",
+        "docs": "/docs",
+        "health": "/health",
+        "info": "/info",
+    }
+
+
 @app.get("/health")
 async def health():
     """Liveness probe."""
