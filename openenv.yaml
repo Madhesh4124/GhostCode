@@ -1,1 +1,73 @@
-# Configuration for OpenEnv settings
+name: ghostcode
+version: "0.1.0"
+description: >
+  A reinforcement learning environment for autonomous debugging
+  of legacy software systems using a mock filesystem.
+author: "Madhesh"
+repository: "https://github.com/Madhesh4124/GhostCode"
+
+environment:
+  module: env.environment
+  class: GhostCodeEnv
+  init_args: {}
+
+observation_space:
+  type: structured
+  fields:
+    terminal_output:
+      type: string
+      description: "Output from last action or service run"
+    file_contents:
+      type: string
+      nullable: true
+      description: "Contents of last file read"
+    file_tree:
+      type: array
+      items: string
+      description: "List of files in current directory"
+    current_path:
+      type: string
+      description: "Current working directory"
+
+action_space:
+  type: discrete_tool
+  actions:
+    - name: read_file
+      params: [path]
+    - name: write_file
+      params: [path, content]
+    - name: run_service
+      params: []
+    - name: install_package
+      params: [package]
+    - name: search_logs
+      params: [keyword]
+    - name: list_directory
+      params: [path]
+
+tasks:
+  - id: easy_missing_dep
+    difficulty: easy
+    max_steps: 10
+    description: "Fix a missing package dependency"
+  - id: medium_config_route
+    difficulty: medium
+    max_steps: 20
+    description: "Fix broken config and API route"
+  - id: hard_multi_failure
+    difficulty: hard
+    max_steps: 35
+    description: "Fix multi-system failure across 3 components"
+
+grader:
+  returns: float
+  range: [0.0, 1.0]
+  deterministic: true
+  module: env.graders
+  function: grade
+
+reward:
+  terminal_success: 100
+  step_penalty: -1
+  invalid_action: -5
+  milestone_first_read: 10
