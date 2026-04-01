@@ -1,4 +1,13 @@
-
+---
+title: GhostCode
+emoji: 👻
+colorFrom: blue
+colorTo: indigo
+sdk: docker
+sdk_version: "latest"
+app_file: server.py
+pinned: false
+---
 # GhostCode
 
 > **An RL environment for autonomous debugging of legacy software systems.**  
