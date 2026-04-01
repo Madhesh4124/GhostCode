@@ -17,6 +17,9 @@ dependencies = [
     "openenv-core>=0.2.0",
 ]
 
+[project.scripts]
+ghostcode-server = "server:app"
+
 [project.urls]
 Homepage = "https://huggingface.co/spaces/Madhesh4124/GhostCode"
 Repository = "https://github.com/Madhesh4124/GhostCode"
