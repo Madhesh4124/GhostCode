@@ -81,8 +81,10 @@ async def info():
 
 
 @app.post("/reset")
-async def reset_session(body: ResetRequest):
+async def reset_session(body: Optional[ResetRequest] = None):
     """Create a new environment session and return the initial observation."""
+    if body is None:
+        body = ResetRequest()  # use defaults
     env = GhostCodeEnv(verbose=False)
     obs = env.reset(task_id=body.task_id, seed=body.seed)
 
