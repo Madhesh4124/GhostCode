@@ -1,0 +1,20 @@
+name: Keep HF Space Warm
+
+on:
+  schedule:
+    - cron: "0 */6 * * *"
+  workflow_dispatch:
+
+jobs:
+  ping-space:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Ping Space health endpoint
+        env:
+          SPACE_HEALTH_URL: ${{ vars.SPACE_HEALTH_URL }}
+        run: |
+          URL="${SPACE_HEALTH_URL:-https://Madhesh4124-ghostcode.hf.space/health}"
+          echo "Pinging $URL"
+          curl --fail --silent --show-error --location --max-time 30 --retry 3 --retry-delay 5 "$URL"
