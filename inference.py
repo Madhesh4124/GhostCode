@@ -364,6 +364,7 @@ def _run_task_impl(task_id: str, use_llm: bool) -> dict:
     no_progress_streak: int = 0
     last_llm_call_time: float = 0.0
     llm_calls_made: int = 0
+    printed_steps: int = 0
 
     while not done:
         current_error = (obs.terminal_output or "").strip()
@@ -462,7 +463,8 @@ def _run_task_impl(task_id: str, use_llm: bool) -> dict:
                 )
 
         total_reward += reward
-        log_step(steps, reward)
+        printed_steps += 1
+        log_step(printed_steps, reward)
 
         action_key = f"{action.action_type}_{action.path or ''}"
         recent_actions.append(action_key)
@@ -491,12 +493,12 @@ def _run_task_impl(task_id: str, use_llm: bool) -> dict:
     if hasattr(env, "close"):
         env.close()
 
-    log_end(task_id, final_score, steps)
+    log_end(task_id, final_score, printed_steps)
 
     return {
         "task_id": task_id,
         "score": final_score,
-        "steps": steps,
+        "steps": printed_steps,
         "total_reward": total_reward,
         "llm_calls": llm_calls_made,
         "agent_type": agent_type,
