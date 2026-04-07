@@ -20,12 +20,16 @@ MAX_LLM_CALLS_PER_TASK  Maximum LLM calls per task (default: 3)
 
 import json
 import os
+import sys
 import time
 import ast
 from dotenv import load_dotenv
 from openai import OpenAI
 
 load_dotenv(override=True)
+
+def debug(*args, **kwargs):
+    pass
 
 from env.environment import GhostCodeEnv
 from models.models import ActionModel
@@ -43,7 +47,16 @@ MAX_TOKENS: int = int(os.getenv("MAX_TOKENS", "1024"))
 TEMPERATURE: float = float(os.getenv("TEMPERATURE", "0.5"))
 TOP_P: float = float(os.getenv("TOP_P", "1.0"))
 # Set VERBOSE_LLM=0 to reduce per-step model diagnostics.
-VERBOSE_LLM: bool = os.getenv("VERBOSE_LLM", "1") == "1"
+VERBOSE_LLM: bool = False
+
+def log_start(task_id):
+    print(f"[START] task={task_id}", flush=True)
+
+def log_step(step, reward):
+    print(f"[STEP] step={step} reward={reward}", flush=True)
+
+def log_end(task_id, score, steps):
+    print(f"[END] task={task_id} score={score} steps={steps}", flush=True)
 
 _SYSTEM_PROMPT = """
 Your goal is to FIX the system in the FEWEST steps possible.
@@ -164,7 +177,7 @@ def _call_llm_with_retry(client, contents, max_retries=MAX_RETRIES):
 
             if "429" in err or "RESOURCE_EXHAUSTED" in err or "rate limit" in err.lower():
                 wait_time = 10 * (2**attempt)
-                print(
+                debug(
                     f"[Rate Limit] Retrying in {wait_time}s... (attempt {attempt + 1}/{max_retries})"
                 )
                 time.sleep(wait_time)
@@ -223,7 +236,7 @@ def llm_agent(
         if not api_key:
             raise ValueError("API_KEY is not set")
 
-        print(f"[LLM] Calling NVIDIA API with model: {MODEL_NAME}")
+        debug(f"[LLM] Calling NVIDIA API with model: {MODEL_NAME}")
         client = OpenAI(base_url=BASE_URL, api_key=api_key)
 
         # Build the user turn for this step
@@ -278,7 +291,7 @@ def llm_agent(
         assistant_content: str = (response.choices[0].message.content or "").strip()
         if VERBOSE_LLM:
             preview = assistant_content.replace("\n", " ")[:220]
-            print(f"[LLM Output] {preview}")
+            debug(f"[LLM Output] {preview}")
 
         # Append to history so the LLM keeps context across steps
         conversation_history.append({"role": "user", "content": user_message})
@@ -287,7 +300,7 @@ def llm_agent(
         # Parse JSON-like output (with defensive extraction) -> ActionModel
         data = _extract_action_json(assistant_content)
         if VERBOSE_LLM:
-            print(
+            debug(
                 "[LLM Parsed] "
                 f"action_type={data.get('action_type')}, "
                 f"path={data.get('path')}, "
@@ -297,7 +310,7 @@ def llm_agent(
 
     except Exception as e:
         # Any failure (network, parse, etc.) → fallback with error logging
-        print(f"[LLM Error] {type(e).__name__}: {e}")
+        debug(f"[LLM Error] {type(e).__name__}: {e}")
         return rule_based_agent(task_id, obs, state)
 
 
@@ -316,6 +329,23 @@ def should_use_llm(action_type: str, force_fallback: bool) -> bool:
 
 
 def run_task(task_id: str, use_llm: bool) -> dict:
+    try:
+        log_start(task_id)
+        result = _run_task_impl(task_id, use_llm)
+        return result
+    except Exception:
+        log_end(task_id, 0.0, 0)
+        return {
+            "task_id": task_id,
+            "score": 0.0,
+            "steps": 0,
+            "total_reward": 0.0,
+            "llm_calls": 0,
+            "agent_type": "error",
+            "agent": "error",
+        }
+
+def _run_task_impl(task_id: str, use_llm: bool) -> dict:
     """Run a single GhostCode task to completion and return a result dict."""
     agent_type = "rule-based+llm" if use_llm else "rule-based"
     env = GhostCodeEnv(verbose=False)
@@ -372,7 +402,7 @@ def run_task(task_id: str, use_llm: bool) -> dict:
             time_since_last = time.time() - last_llm_call_time
             if time_since_last < LLM_CALL_DELAY:
                 wait = LLM_CALL_DELAY - time_since_last
-                print(f"[Rate Limit] Waiting {wait:.1f}s before next LLM call...")
+                debug(f"[Rate Limit] Waiting {wait:.1f}s before next LLM call...")
                 time.sleep(wait)
 
             action = llm_agent(
@@ -383,14 +413,14 @@ def run_task(task_id: str, use_llm: bool) -> dict:
             step_agent = "llm"
         else:
             if force_fallback:
-                print("[Fallback] LLM stuck — switching to rule-based for this step")
+                debug("[Fallback] LLM stuck — switching to rule-based for this step")
             elif use_llm and llm_allowed_for_step and not llm_budget_available:
-                print(
+                debug(
                     "[Rate Limit] LLM call budget reached for this task "
                     f"({MAX_LLM_CALLS_PER_TASK}) — using rule-based fallback"
                 )
             elif use_llm and not llm_allowed_for_step and VERBOSE_LLM:
-                print(
+                debug(
                     "[LLM Skip] Planned action is "
                     f"{planned_action.action_type}; no strategy-shift trigger active"
                 )
@@ -400,7 +430,7 @@ def run_task(task_id: str, use_llm: bool) -> dict:
         if action.action_type == "write_file":
             previous = last_written_content.get(action.path)
             if previous is not None and action.content == previous:
-                print("[Loop Detected] Same write attempted — forcing strategy change")
+                debug("[Loop Detected] Same write attempted — forcing strategy change")
                 if steps >= env.state().max_steps:
                     break
                 continue
@@ -417,20 +447,21 @@ def run_task(task_id: str, use_llm: bool) -> dict:
             reward += v_reward
             obs, done, info = v_obs, v_done, v_info
             if v_info.get("grade", 0.0) >= 1.0:
-                total_reward += reward
-                print("[Success] Task completed — exiting early")
-                break
+                done = True
+                debug("[Success] Task completed — exiting early")
+            
             if VERBOSE_LLM:
-                print("[Auto-Validate] Executed run_service after write_file")
+                debug("[Auto-Validate] Executed run_service after write_file")
 
             post_error = (obs.terminal_output or "").strip()
             if action.path and post_error == pre_action_error:
                 failed_targets.add(action.path)
-                print(
+                debug(
                     f"[Failure Memory] Marked {action.path} as failed target (no progress)"
                 )
 
         total_reward += reward
+        log_step(steps, reward)
 
         action_key = f"{action.action_type}_{action.path or ''}"
         recent_actions.append(action_key)
@@ -449,27 +480,17 @@ def run_task(task_id: str, use_llm: bool) -> dict:
             params_parts.append(f"keyword={action.keyword}")
         params = ", ".join(params_parts)
 
-        print(
-            f"\n"
-            f"----------------------------------------\n"
-            f"Task: {task_id}  |  Step {steps}\n"
-            f"----------------------------------------\n"
-            f"Agent   : {step_agent}\n"
-            f"LLM Cnt : {llm_calls_made}/{MAX_LLM_CALLS_PER_TASK}\n"
-            f"Action  : {action.action_type}({params})\n"
-            f"Result  : {obs.terminal_output[:120]}\n"
-            f"Reward  : {reward:+.0f}\n"
-            f"Score   : {info.get('grade', 0.0):.0%}\n"
-            f"----------------------------------------"
-        )
 
-        if steps >= env.state().max_steps:
+
+        if done or steps >= env.state().max_steps:
             break
 
     final_score = info.get("grade", 0.0)
 
     if hasattr(env, "close"):
         env.close()
+
+    log_end(task_id, final_score, steps)
 
     return {
         "task_id": task_id,
@@ -489,7 +510,7 @@ def run_task(task_id: str, use_llm: bool) -> dict:
 if __name__ == "__main__":
     use_llm = bool(os.getenv("API_KEY"))
     if not use_llm:
-        print("No API_KEY found — using rule-based agent\n")
+        debug("No API_KEY found — using rule-based agent\n")
 
     results = []
     for task_id in ["easy_missing_dep", "medium_config_route", "hard_multi_failure"]:
@@ -503,7 +524,4 @@ if __name__ == "__main__":
         "average_score": round(avg, 3),
     }
 
-    print("\n" + "=" * 40)
-    print("FINAL RESULTS")
-    print("=" * 40)
-    print(json.dumps(output, indent=2))
+
