@@ -38,8 +38,9 @@ from models.models import ActionModel
 # Configuration
 # ---------------------------------------------------------------------------
 
-BASE_URL: str = os.getenv("BASE_URL", "https://integrate.api.nvidia.com/v1")
-MODEL_NAME: str = os.getenv("MODEL_NAME", "mistralai/mamba-codestral-7b-v0.1")
+API_BASE_URL = os.getenv("API_BASE_URL", "https://integrate.api.nvidia.com/v1")
+MODEL_NAME = os.getenv("MODEL_NAME", "mistralai/mamba-codestral-7b-v0.1")
+HF_TOKEN = os.getenv("HF_TOKEN")
 LLM_CALL_DELAY: float = 5.0  # seconds between LLM calls to respect 15 RPM limit
 MAX_RETRIES: int = 3
 MAX_LLM_CALLS_PER_TASK: int = int(os.getenv("MAX_LLM_CALLS_PER_TASK", "3"))
@@ -232,12 +233,12 @@ def llm_agent(
 ) -> ActionModel:
     """Calls chat completions API and parses the response as an ActionModel."""
     try:
-        api_key = os.getenv("API_KEY")
+        api_key = os.getenv("HF_TOKEN") or os.getenv("API_KEY")
         if not api_key:
-            raise ValueError("API_KEY is not set")
+            raise ValueError("HF_TOKEN or API_KEY is not set")
 
         debug(f"[LLM] Calling NVIDIA API with model: {MODEL_NAME}")
-        client = OpenAI(base_url=BASE_URL, api_key=api_key)
+        client = OpenAI(base_url=API_BASE_URL, api_key=api_key)
 
         # Build the user turn for this step
         user_message = f"""
@@ -508,9 +509,9 @@ def _run_task_impl(task_id: str, use_llm: bool) -> dict:
 # ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
-    use_llm = bool(os.getenv("API_KEY"))
+    use_llm = bool(os.getenv("HF_TOKEN") or os.getenv("API_KEY"))
     if not use_llm:
-        debug("No API_KEY found — using rule-based agent\n")
+        debug("No API_KEY/HF_TOKEN found — using rule-based agent\n")
 
     results = []
     for task_id in ["easy_missing_dep", "medium_config_route", "hard_multi_failure"]:
